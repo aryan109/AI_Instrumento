@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Instrumento - Grand Piano MIDI Studio</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header / Brand -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">🎹</div>
+        <div>
+          <h1 class="brand-title">AI INSTRUMENTO</h1>
+          <p class="brand-subtitle">Concert Grand Piano MIDI Performance & Visualization Studio</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div class="file-picker-wrapper">
+          <label for="midiSelect" class="label-muted">Active MIDI File:</label>
+          <select id="midiSelect" class="select-file">
+            <option value="">Scanning directory...</option>
+          </select>
+          <button id="btnRefreshFiles" class="btn-icon" title="Refresh directory files">🔄</button>
+        </div>
+
+        <div class="upload-badge" id="dropBadge" title="Drag & drop any .mid file into this window">
+          <span>Drop .mid here</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Studio View -->
+    <main class="studio-main">
+      <!-- File & Playback Info Bar -->
+      <section class="info-bar">
+        <div class="file-stats">
+          <span class="badge" id="songTitle">jan gan man.mid</span>
+          <span class="stat-pill">Duration: <strong id="statDuration">0:00</strong></span>
+          <span class="stat-pill">Notes: <strong id="statNotes">0</strong></span>
+          <span class="stat-pill">Piano Tracks: <strong id="statTracks">Studio Grand</strong></span>
+          <span class="stat-pill">Active Notes: <strong id="statActiveNotes" class="highlight-text">0</strong></span>
+        </div>
+
+        <div class="audio-mode-selector">
+          <label class="radio-label">
+            <input type="radio" name="soundEngine" value="web" checked id="engineWeb">
+            <span>Studio Web Audio</span>
+          </label>
+          <label class="radio-label" title="Plays directly through Windows hardware Multimedia General MIDI synth">
+            <input type="radio" name="soundEngine" value="native" id="engineNative">
+            <span>Windows Native MIDI (winmm)</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Waterfall Canvas (Synthesia Visualizer) -->
+      <section class="visualizer-container">
+        <canvas id="waterfallCanvas"></canvas>
+        <div class="visualizer-overlay" id="visualizerOverlay">
+          <button id="overlayPlayBtn" class="big-play-btn">
+            <span class="play-icon">▶</span>
+            <span>PLAY ON GRAND PIANO</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Piano Fallboard with Gold Crest -->
+      <div class="fallboard">
+        <div class="piano-brand-emboss">STEINWAY &amp; SONS &bull; CONCERT GRAND</div>
+      </div>
+
+      <!-- 88-Key Grand Piano Keyboard -->
+      <section class="piano-keyboard-wrapper">
+        <div id="pianoKeyboard" class="piano-keyboard"></div>
+      </section>
+
+      <!-- Playback Control Center -->
+      <footer class="control-center">
+        <!-- Timeline Slider -->
+        <div class="timeline-row">
+          <span id="currentTimeDisplay" class="time-text">00:00</span>
+          <div class="scrubber-wrapper">
+            <input type="range" id="seekSlider" min="0" max="100" value="0" step="0.1" class="seek-slider">
+            <div id="seekProgressFill" class="seek-progress"></div>
+          </div>
+          <span id="totalTimeDisplay" class="time-text">00:00</span>
+        </div>
+
+        <!-- Controls Row -->
+        <div class="controls-row">
+          <div class="playback-buttons">
+            <button id="btnPrev" class="ctrl-btn" title="Restart">⏮</button>
+            <button id="btnPlayPause" class="ctrl-btn main-play-btn" title="Play / Pause">▶</button>
+            <button id="btnStop" class="ctrl-btn" title="Stop">⏹</button>
+          </div>
+
+          <div class="speed-controls">
+            <span class="ctrl-label">Tempo:</span>
+            <button class="btn-chip" data-speed="0.5">0.5x</button>
+            <button class="btn-chip active" data-speed="1.0">1.0x</button>
+            <button class="btn-chip" data-speed="1.25">1.25x</button>
+            <button class="btn-chip" data-speed="1.5">1.5x</button>
+            <input type="range" id="tempoSlider" min="0.25" max="2.0" step="0.05" value="1.0" class="mini-slider" title="Custom Tempo">
+            <span id="tempoValue" class="tempo-text">1.0x</span>
+          </div>
+
+          <div class="volume-controls">
+            <span class="ctrl-label">Volume:</span>
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.8" class="mini-slider">
+            <span id="volumeValue" class="tempo-text">80%</span>
+          </div>
+
+          <div class="toggle-controls">
+            <label class="switch-label">
+              <input type="checkbox" id="pianoOnlyToggle">
+              <span>Grand Piano Tracks Only</span>
+            </label>
+            <label class="switch-label">
+              <input type="checkbox" id="keyLabelsToggle" checked>
+              <span>Key Names</span>
+            </label>
+          </div>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <script src="piano.js"></script>
+</body>
+</html>
