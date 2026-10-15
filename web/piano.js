@@ -1,6 +1,7 @@
 /**
- * AI Instrumento - Grand Piano Sound Synthesizer & Visualizer
+ * AI Instrumento - Smart Grand Piano Sound Synthesizer & Visualizer
  * High-fidelity Acoustic Grand Piano Web Audio engine + 88-Key Waterfall Visualizer
+ * with Smart Track Identification and Solo Piano Lead Focus.
  */
 
 class GrandPianoAudio {
@@ -8,7 +9,7 @@ class GrandPianoAudio {
     this.ctx = null;
     this.masterGain = null;
     this.compressor = null;
-    this.activeVoices = new Map(); // noteNumber -> array of oscillators & gains
+    this.activeVoices = new Map();
     this.volume = 0.8;
   }
 
@@ -17,7 +18,6 @@ class GrandPianoAudio {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     this.ctx = new AudioCtx();
 
-    // Dynamics compressor to prevent clipping on heavy chords
     this.compressor = this.ctx.createDynamicsCompressor();
     this.compressor.threshold.setValueAtTime(-14, this.ctx.currentTime);
     this.compressor.knee.setValueAtTime(20, this.ctx.currentTime);
@@ -43,11 +43,6 @@ class GrandPianoAudio {
     return 440 * Math.pow(2, (midi - 69) / 12);
   }
 
-  /**
-   * High fidelity physical acoustic grand piano synthesis
-   * Includes fundamental, inharmonic steel string harmonics, hammer strike transient thud,
-   * and dual-stage decay envelope.
-   */
   playNote(midi, velocity = 100, duration = 0.8) {
     if (!this.ctx) this.init();
     if (this.ctx.state === 'suspended') {
@@ -56,13 +51,12 @@ class GrandPianoAudio {
 
     const now = this.ctx.currentTime;
     const baseFreq = this.midiToFreq(midi);
-    const velFactor = Math.pow(velocity / 127, 1.4); // Natural velocity curve
+    const velFactor = Math.pow(velocity / 127, 1.4);
 
-    // Key group for stopping
     const voiceId = `${midi}_${now}`;
     const voiceNodes = [];
 
-    // 1. Hammer strike percussive noise transient (wood on felt thud)
+    // 1. Hammer strike percussive noise transient
     const hammerBuffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.03, this.ctx.sampleRate);
     const hammerData = hammerBuffer.getChannelData(0);
     for (let i = 0; i < hammerData.length; i++) {
@@ -86,8 +80,7 @@ class GrandPianoAudio {
     hammerSource.start(now);
     voiceNodes.push(hammerSource);
 
-    // 2. Harmonic Partial Synthesis (Fundamental + 6 Overtones)
-    // Acoustic piano strings exhibit slight inharmonicity: f_n = n * f0 * sqrt(1 + B * n^2)
+    // 2. Harmonic Partial Synthesis
     const inharmonicity = 0.0002;
     const partials = [
       { n: 1, gain: 1.0, decayMult: 1.0 },
@@ -98,7 +91,6 @@ class GrandPianoAudio {
       { n: 6, gain: 0.04, decayMult: 0.2 },
     ];
 
-    // Piano notes decay slower in lower registers, faster in treble
     const registerDecay = Math.max(0.5, Math.min(4.5, 4.0 - (midi - 21) * 0.035));
     const noteHoldTime = Math.max(0.2, duration);
 
@@ -108,15 +100,12 @@ class GrandPianoAudio {
 
       const freqMultiplier = p.n * Math.sqrt(1 + inharmonicity * p.n * p.n);
       osc.frequency.setValueAtTime(baseFreq * freqMultiplier, now);
-      // Triangle wave provides soft natural string timbre for partials
       osc.type = p.n === 1 ? 'sine' : 'triangle';
 
       const partialAmp = p.gain * velFactor * 0.28;
       pGain.gain.setValueAtTime(0.0001, now);
-      // Fast attack
       pGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, partialAmp), now + 0.004);
       
-      // Dual stage decay: initial strike decay into sustained ring
       const decayTime = noteHoldTime * registerDecay * p.decayMult;
       const sustainLevel = Math.max(0.0001, partialAmp * 0.4);
       pGain.gain.exponentialRampToValueAtTime(sustainLevel, now + Math.min(0.25, noteHoldTime * 0.5));
@@ -147,15 +136,11 @@ class GrandPianoAudio {
   }
 }
 
-/**
- * 88-Key Piano Keyboard Layout & DOM Renderer
- * Range: A0 (MIDI 21) to C8 (MIDI 108) = 88 Keys (52 White, 36 Black)
- */
 class PianoKeyboard {
   constructor(containerEl, onKeyClick) {
     this.container = containerEl;
     this.onKeyClick = onKeyClick;
-    this.keyElements = new Map(); // midiNumber -> DOM Element
+    this.keyElements = new Map();
     this.whiteKeyCount = 52;
     this.render();
   }
@@ -165,7 +150,6 @@ class PianoKeyboard {
     const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
     let whiteIndex = 0;
 
-    // First pass: create all white keys
     for (let midi = 21; midi <= 108; midi++) {
       const semitone = midi % 12;
       const isBlack = [1, 3, 6, 8, 10].includes(semitone);
@@ -190,13 +174,11 @@ class PianoKeyboard {
       }
     }
 
-    // Second pass: position black keys relative to white keys
     whiteIndex = 0;
     for (let midi = 21; midi <= 108; midi++) {
       const semitone = midi % 12;
       const isBlack = [1, 3, 6, 8, 10].includes(semitone);
-      const octave = Math.floor(midi / 12) - 1;
-      const noteName = `${noteNames[semitone]}${octave}`;
+      const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
       if (!isBlack) {
         whiteIndex++;
@@ -206,8 +188,6 @@ class PianoKeyboard {
         blackKey.dataset.midi = midi;
         blackKey.innerHTML = `<span class="key-label">${noteNames[semitone]}</span>`;
 
-        // Calculate left percentage based on preceding white key
-        // Total 52 white keys => each is (100 / 52)% wide ~ 1.923%
         const whiteWidthPercent = 100 / 52;
         const leftPercent = (whiteIndex * whiteWidthPercent) - (whiteWidthPercent * 0.32);
         blackKey.style.left = `${leftPercent}%`;
@@ -262,16 +242,13 @@ class PianoKeyboard {
   }
 }
 
-/**
- * Waterfall Canvas Visualizer (Synthesia Style)
- */
 class WaterfallVisualizer {
   constructor(canvasEl, keyboard) {
     this.canvas = canvasEl;
     this.ctx = canvasEl.getContext('2d');
     this.keyboard = keyboard;
-    this.notes = []; // [{note, start, duration, velocity, channel, is_black}]
-    this.lookAheadSec = 3.5; // Seconds of incoming notes visible on canvas
+    this.notes = [];
+    this.lookAheadSec = 3.5;
     this.resize();
     window.addEventListener('resize', () => this.resize());
   }
@@ -293,7 +270,6 @@ class WaterfallVisualizer {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.width, this.height);
 
-    // Subtle background guidelines for octaves
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
     ctx.lineWidth = 1;
     for (let cMidi = 24; cMidi <= 108; cMidi += 12) {
@@ -309,17 +285,13 @@ class WaterfallVisualizer {
 
     const visibleMinTime = currentTime - 0.2;
     const visibleMaxTime = currentTime + this.lookAheadSec;
-
-    // Bottom edge of canvas corresponds to currentTime
     const h = this.height;
     const timeScale = h / this.lookAheadSec;
 
-    // Filter and render visible notes
     for (let i = 0; i < this.notes.length; i++) {
       const n = this.notes[i];
       const noteEnd = n.start + n.duration;
 
-      // Note hasn't appeared yet or has already passed
       if (noteEnd < visibleMinTime || n.start > visibleMaxTime) continue;
 
       const pct = this.keyboard.getKeyXCenterPercent(n.note);
@@ -327,25 +299,28 @@ class WaterfallVisualizer {
       const keyWidth = (this.width / 52) * (n.is_black ? 0.65 : 0.85);
       const x = xCenter - keyWidth / 2;
 
-      // Y coordinates: notes travel downwards towards y = h
       const yBottom = h - ((n.start - currentTime) * timeScale);
       const yTop = h - ((noteEnd - currentTime) * timeScale);
       const noteHeight = Math.max(6, yBottom - yTop);
 
-      // Gradient color based on pitch & grand piano warmth
       const isCurrentlyPlaying = (currentTime >= n.start && currentTime <= noteEnd);
       
       const grad = ctx.createLinearGradient(x, yTop, x + keyWidth, yBottom);
       if (isCurrentlyPlaying) {
-        grad.addColorStop(0, '#fff4cc');
-        grad.addColorStop(0.5, '#ffd043');
-        grad.addColorStop(1, '#ff9900');
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.4, '#ffd043');
+        grad.addColorStop(1, '#ff8800');
+      } else if (n.is_piano_lead) {
+        // High visibility radiant gold for piano lead
+        grad.addColorStop(0, '#ffea9f');
+        grad.addColorStop(0.6, '#d4af37');
+        grad.addColorStop(1, '#8a6a12');
       } else if (n.is_black) {
-        grad.addColorStop(0, '#aa841c');
-        grad.addColorStop(1, '#664d0a');
+        grad.addColorStop(0, '#785b1a');
+        grad.addColorStop(1, '#44330d');
       } else {
-        grad.addColorStop(0, '#f9dd7b');
-        grad.addColorStop(1, '#c29724');
+        grad.addColorStop(0, '#93a1b8');
+        grad.addColorStop(1, '#4b5563');
       }
 
       ctx.fillStyle = grad;
@@ -353,23 +328,18 @@ class WaterfallVisualizer {
       ctx.roundRect(x, yTop, keyWidth, noteHeight, 4);
       ctx.fill();
 
-      // Border glow when actively hitting the keyboard
       if (isCurrentlyPlaying) {
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.8;
         ctx.stroke();
 
-        // Hit flash at bottom
-        ctx.fillStyle = 'rgba(255, 220, 100, 0.4)';
-        ctx.fillRect(x - 2, h - 4, keyWidth + 4, 4);
+        ctx.fillStyle = 'rgba(255, 230, 120, 0.5)';
+        ctx.fillRect(x - 3, h - 5, keyWidth + 6, 5);
       }
     }
   }
 }
 
-/**
- * Main Application Orchestrator
- */
 class GrandPianoStudio {
   constructor() {
     this.audio = new GrandPianoAudio();
@@ -386,16 +356,18 @@ class GrandPianoStudio {
     this.currentFile = null;
     this.parsedData = null;
     this.filteredNotes = [];
+    this.playMode = 'lead'; // 'lead', 'track', 'all'
+    this.selectedTrackId = null;
+
     this.isPlaying = false;
     this.playbackTime = 0.0;
     this.duration = 0.0;
     this.speed = 1.0;
     this.volume = 0.8;
-    this.soundEngine = 'web'; // 'web' or 'native'
+    this.soundEngine = 'web';
     this.lastFrameTime = 0;
     this.noteTriggerIndex = 0;
     this.activeNoteNumbers = new Set();
-    this.pianoTracksOnly = false;
 
     this.initElements();
     this.attachEvents();
@@ -407,46 +379,88 @@ class GrandPianoStudio {
     this.el = {
       midiSelect: document.getElementById('midiSelect'),
       btnRefresh: document.getElementById('btnRefreshFiles'),
+      btnExportLead: document.getElementById('btnExportLead'),
+      btnInspectTracks: document.getElementById('btnInspectTracks'),
+      trackCountBadge: document.getElementById('trackCountBadge'),
       dropBadge: document.getElementById('dropBadge'),
+      
+      tabLead: document.getElementById('tabLead'),
+      tabTrack: document.getElementById('tabTrack'),
+      tabAll: document.getElementById('tabAll'),
+      trackSelectWrapper: document.getElementById('trackSelectWrapper'),
+      trackSelect: document.getElementById('trackSelect'),
+      leadStatusText: document.getElementById('leadStatusText'),
+
       songTitle: document.getElementById('songTitle'),
       statDuration: document.getElementById('statDuration'),
       statNotes: document.getElementById('statNotes'),
-      statTracks: document.getElementById('statTracks'),
+      statLeadNotes: document.getElementById('statLeadNotes'),
       statActiveNotes: document.getElementById('statActiveNotes'),
+      
       overlay: document.getElementById('visualizerOverlay'),
       overlayPlayBtn: document.getElementById('overlayPlayBtn'),
+      overlayBtnText: document.getElementById('overlayBtnText'),
       btnPlayPause: document.getElementById('btnPlayPause'),
       btnStop: document.getElementById('btnStop'),
       btnPrev: document.getElementById('btnPrev'),
+      
       seekSlider: document.getElementById('seekSlider'),
       seekProgress: document.getElementById('seekProgressFill'),
       currentTime: document.getElementById('currentTimeDisplay'),
       totalTime: document.getElementById('totalTimeDisplay'),
+      
       tempoSlider: document.getElementById('tempoSlider'),
       tempoValue: document.getElementById('tempoValue'),
       volumeSlider: document.getElementById('volumeSlider'),
       volumeValue: document.getElementById('volumeValue'),
-      pianoOnlyToggle: document.getElementById('pianoOnlyToggle'),
       keyLabelsToggle: document.getElementById('keyLabelsToggle'),
       engineWeb: document.getElementById('engineWeb'),
       engineNative: document.getElementById('engineNative'),
+
+      trackModal: document.getElementById('trackModal'),
+      modalSongName: document.getElementById('modalSongName'),
+      modalCloseBtn: document.getElementById('modalCloseBtn'),
+      modalCloseBtn2: document.getElementById('modalCloseBtn2'),
+      modalExportBtn: document.getElementById('modalExportBtn'),
+      trackTableBody: document.getElementById('trackTableBody'),
     };
   }
 
   attachEvents() {
-    // Play / Pause / Stop
     this.el.btnPlayPause.addEventListener('click', () => this.togglePlay());
     this.el.overlayPlayBtn.addEventListener('click', () => this.play());
     this.el.btnStop.addEventListener('click', () => this.stop());
     this.el.btnPrev.addEventListener('click', () => this.restart());
 
-    // File selection
     this.el.midiSelect.addEventListener('change', (e) => {
-      const selected = e.target.value;
-      if (selected) this.loadFile(selected);
+      if (e.target.value) this.loadFile(e.target.value);
     });
 
     this.el.btnRefresh.addEventListener('click', () => this.loadFileList());
+
+    // Smart Mode Tabs
+    this.el.tabLead.addEventListener('click', () => this.setMode('lead'));
+    this.el.tabTrack.addEventListener('click', () => this.setMode('track'));
+    this.el.tabAll.addEventListener('click', () => this.setMode('all'));
+
+    // Track Selector
+    this.el.trackSelect.addEventListener('change', (e) => {
+      this.selectedTrackId = parseInt(e.target.value);
+      this.filterNotes();
+      this.seekTo(0);
+    });
+
+    // Modal
+    this.el.btnInspectTracks.addEventListener('click', () => this.openTrackModal());
+    this.el.modalCloseBtn.addEventListener('click', () => this.closeTrackModal());
+    this.el.modalCloseBtn2.addEventListener('click', () => this.closeTrackModal());
+    this.el.trackModal.addEventListener('click', (e) => {
+      if (e.target === this.el.trackModal) this.closeTrackModal();
+    });
+
+    // Export Lead
+    this.el.btnExportLead.addEventListener('click', () => this.exportLeadMidi());
+    this.el.modalExportBtn.addEventListener('click', () => this.exportLeadMidi());
 
     // Timeline Scrubbing
     this.el.seekSlider.addEventListener('input', (e) => {
@@ -468,7 +482,6 @@ class GrandPianoStudio {
       this.setSpeed(parseFloat(e.target.value));
     });
 
-    // Volume
     this.el.volumeSlider.addEventListener('input', (e) => {
       const v = parseFloat(e.target.value);
       this.volume = v;
@@ -476,17 +489,10 @@ class GrandPianoStudio {
       this.el.volumeValue.textContent = `${Math.round(v * 100)}%`;
     });
 
-    // Toggles
     this.el.keyLabelsToggle.addEventListener('change', (e) => {
       this.keyboard.toggleLabels(e.target.checked);
     });
 
-    this.el.pianoOnlyToggle.addEventListener('change', (e) => {
-      this.pianoTracksOnly = e.target.checked;
-      this.filterNotes();
-    });
-
-    // Sound engine
     this.el.engineWeb.addEventListener('change', () => {
       this.soundEngine = 'web';
     });
@@ -494,7 +500,6 @@ class GrandPianoStudio {
       this.soundEngine = 'native';
     });
 
-    // Drag and drop MIDI file
     window.addEventListener('dragover', (e) => {
       e.preventDefault();
       this.el.dropBadge.classList.add('dragover');
@@ -512,7 +517,6 @@ class GrandPianoStudio {
       }
     });
 
-    // Keyboard Spacebar play/pause
     window.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
       if (e.code === 'Space') {
@@ -520,6 +524,18 @@ class GrandPianoStudio {
         this.togglePlay();
       }
     });
+  }
+
+  setMode(mode) {
+    this.playMode = mode;
+    this.el.tabLead.classList.toggle('active', mode === 'lead');
+    this.el.tabTrack.classList.toggle('active', mode === 'track');
+    this.el.tabAll.classList.toggle('active', mode === 'all');
+
+    this.el.trackSelectWrapper.style.display = (mode === 'track') ? 'flex' : 'none';
+
+    this.filterNotes();
+    this.seekTo(0);
   }
 
   setSpeed(s) {
@@ -542,18 +558,19 @@ class GrandPianoStudio {
       this.files.forEach(f => {
         const opt = document.createElement('option');
         opt.value = f.name;
-        opt.textContent = `${f.name} (${f.total_notes || 0} notes)`;
+        const tag = f.is_lead_file ? ' [SOLO LEAD]' : '';
+        opt.textContent = `${f.name}${tag} (${f.total_notes || 0} notes)`;
         this.el.midiSelect.appendChild(opt);
       });
 
       // Default to jan gan man.mid or first file
-      const defaultFile = this.files.find(f => f.name.toLowerCase().includes('jan gan man')) || this.files[0];
+      const defaultFile = this.files.find(f => f.name.toLowerCase().includes('jan gan man') && !f.is_lead_file) || this.files[0];
       if (defaultFile) {
         this.el.midiSelect.value = defaultFile.name;
         this.loadFile(defaultFile.name);
       }
     } catch (err) {
-      console.warn("Could not load /api/files, operating in offline/demo mode:", err);
+      console.warn("Could not load /api/files:", err);
     }
   }
 
@@ -561,6 +578,7 @@ class GrandPianoStudio {
     this.stop();
     this.currentFile = fileName;
     this.el.songTitle.textContent = fileName;
+    this.el.modalSongName.textContent = fileName;
 
     try {
       const res = await fetch(`/api/parse/${encodeURIComponent(fileName)}`);
@@ -568,14 +586,24 @@ class GrandPianoStudio {
       this.duration = this.parsedData.duration || 10;
       this.el.statDuration.textContent = this.formatTime(this.duration);
       this.el.totalTime.textContent = this.formatTime(this.duration);
-      this.el.statNotes.textContent = this.parsedData.total_notes;
+      this.el.statLeadNotes.textContent = `${this.parsedData.lead_notes_count} notes`;
+      this.el.trackCountBadge.textContent = this.parsedData.tracks.length;
 
-      // Extract piano track info
-      const pianoTracks = this.parsedData.tracks.filter(t => t.is_piano);
-      if (pianoTracks.length) {
-        this.el.statTracks.textContent = `${pianoTracks.length} tracks (${pianoTracks[0].name})`;
-      } else {
-        this.el.statTracks.textContent = "All mapped to Grand Piano";
+      // Populate track selector
+      this.el.trackSelect.innerHTML = '';
+      this.parsedData.tracks.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        const leadStar = t.is_piano_lead ? '★ ' : '';
+        opt.textContent = `${leadStar}Track ${t.id}: ${t.name} (${t.notes_count} notes)`;
+        this.el.trackSelect.appendChild(opt);
+      });
+
+      if (this.parsedData.lead_track_ids && this.parsedData.lead_track_ids.length > 0) {
+        this.selectedTrackId = this.parsedData.lead_track_ids[0];
+        this.el.trackSelect.value = this.selectedTrackId;
+      } else if (this.parsedData.tracks.length > 0) {
+        this.selectedTrackId = this.parsedData.tracks[0].id;
       }
 
       this.filterNotes();
@@ -587,17 +615,95 @@ class GrandPianoStudio {
 
   filterNotes() {
     if (!this.parsedData) return;
-    if (this.pianoTracksOnly) {
-      // Find tracks identified as piano
-      const pianoTrackNames = this.parsedData.tracks.filter(t => t.is_piano).map(t => t.name.toLowerCase());
-      this.filteredNotes = this.parsedData.notes.filter(n => {
-        // If track name matches or track id
-        return true; // Keep all or isolate
-      });
+
+    if (this.playMode === 'lead') {
+      this.filteredNotes = this.parsedData.lead_notes || [];
+      this.el.overlayBtnText.textContent = "PLAY MAIN PIANO LEAD";
+      this.el.leadStatusText.textContent = `Smart Classifier: Main Piano Lead (${this.filteredNotes.length} notes across ${this.parsedData.lead_track_ids.length} phrases)`;
+    } else if (this.playMode === 'track') {
+      this.filteredNotes = this.parsedData.notes.filter(n => n.track_id === this.selectedTrackId);
+      const trk = this.parsedData.tracks.find(t => t.id === this.selectedTrackId);
+      const name = trk ? trk.name : `Track ${this.selectedTrackId}`;
+      this.el.overlayBtnText.textContent = `PLAY "${name.toUpperCase()}" SOLO`;
+      this.el.leadStatusText.textContent = `Soloing Track ${this.selectedTrackId}: ${name} (${this.filteredNotes.length} notes)`;
     } else {
-      this.filteredNotes = this.parsedData.notes;
+      this.filteredNotes = this.parsedData.notes || [];
+      this.el.overlayBtnText.textContent = "PLAY ALL TRACKS ON GRAND PIANO";
+      this.el.leadStatusText.textContent = `Full Arrangement Mode: ${this.filteredNotes.length} total notes`;
     }
+
+    this.el.statNotes.textContent = this.filteredNotes.length;
     this.visualizer.setNotes(this.filteredNotes);
+  }
+
+  openTrackModal() {
+    if (!this.parsedData) return;
+    const tbody = this.el.trackTableBody;
+    tbody.innerHTML = '';
+
+    const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    const pToName = (p) => `${noteNames[p % 12]}${Math.floor(p / 12) - 1}`;
+
+    this.parsedData.tracks.forEach(t => {
+      const tr = document.createElement('tr');
+      if (t.is_piano_lead) tr.className = 'is-lead-row';
+
+      const badgeClass = t.is_piano_lead ? 'badge-lead' : 'badge-other';
+      const rangeStr = `${pToName(t.pitch_min)} - ${pToName(t.pitch_max)} (avg ${t.pitch_avg})`;
+
+      tr.innerHTML = `
+        <td><strong>#${t.id}</strong></td>
+        <td>${t.name}</td>
+        <td><span class="${badgeClass}">${t.badge}</span></td>
+        <td><strong>${t.notes_count}</strong></td>
+        <td>${rangeStr}</td>
+        <td>
+          <button class="btn-table-solo" data-track-id="${t.id}">Solo on Piano</button>
+        </td>
+      `;
+
+      tr.querySelector('.btn-table-solo').addEventListener('click', () => {
+        this.soloTrack(t.id);
+      });
+
+      tbody.appendChild(tr);
+    });
+
+    this.el.trackModal.style.display = 'flex';
+  }
+
+  closeTrackModal() {
+    this.el.trackModal.style.display = 'none';
+  }
+
+  soloTrack(trackId) {
+    this.closeTrackModal();
+    this.selectedTrackId = trackId;
+    this.el.trackSelect.value = trackId;
+    this.setMode('track');
+    this.play();
+  }
+
+  async exportLeadMidi() {
+    if (!this.currentFile) return;
+    try {
+      const res = await fetch('/api/export-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: this.currentFile })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Main Piano Lead exported successfully!\n\nSaved as: ${data.lead_file}`);
+        await this.loadFileList();
+        this.el.midiSelect.value = data.lead_file;
+        this.loadFile(data.lead_file);
+      } else {
+        alert("Export failed: " + (data.error || "Unknown error"));
+      }
+    } catch (err) {
+      alert("Export request failed: " + err.message);
+    }
   }
 
   async uploadMidiFile(file) {
@@ -647,7 +753,12 @@ class GrandPianoStudio {
       fetch('/api/play-native', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: this.currentFile, speed: this.speed })
+        body: JSON.stringify({
+          file: this.currentFile,
+          speed: this.speed,
+          solo_lead: (this.playMode === 'lead'),
+          selected_track_ids: (this.playMode === 'track' ? [this.selectedTrackId] : null)
+        })
       }).catch(err => console.warn(err));
     }
   }
@@ -686,7 +797,6 @@ class GrandPianoStudio {
     this.keyboard.clearAllKeys();
     this.activeNoteNumbers.clear();
 
-    // Recalculate note trigger index for fast playback search
     this.noteTriggerIndex = 0;
     while (
       this.noteTriggerIndex < this.filteredNotes.length &&
@@ -737,14 +847,12 @@ class GrandPianoStudio {
   }
 
   processActiveNotes() {
-    // 1. Trigger newly starting notes
     while (
       this.noteTriggerIndex < this.filteredNotes.length &&
       this.filteredNotes[this.noteTriggerIndex].start <= this.playbackTime
     ) {
       const n = this.filteredNotes[this.noteTriggerIndex];
 
-      // Only trigger if note hasn't already expired
       if (this.playbackTime < n.start + n.duration) {
         if (this.soundEngine === 'web') {
           this.audio.playNote(n.note, n.velocity, n.duration);
@@ -755,9 +863,7 @@ class GrandPianoStudio {
       this.noteTriggerIndex++;
     }
 
-    // 2. Release keys whose duration has expired
     this.activeNoteNumbers.forEach(noteNum => {
-      // Check if any note is still active for this pitch
       const isStillActive = this.filteredNotes.some(
         n => n.note === noteNum &&
              this.playbackTime >= n.start &&
@@ -773,7 +879,6 @@ class GrandPianoStudio {
   }
 }
 
-// Start application when DOM is ready
 window.addEventListener('DOMContentLoaded', () => {
   window.studio = new GrandPianoStudio();
 });

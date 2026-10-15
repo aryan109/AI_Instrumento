@@ -77,6 +77,64 @@ AI Instrumento is an intelligent, high-fidelity MIDI-to-Grand Piano playback and
   - Verified `/api/parse/jan gan man.mid` successfully parsed 2,159 note events with millisecond precision.
 - Verified Windows Multimedia API (`winmm.dll`) real-time note playback on General MIDI Acoustic Grand Piano (Program 0).
 
+### [2026-10-15] - Smart Track Classification & Piano Lead Extraction (piano_engine.py)
+- Implemented `SmartTrackClassifier` in `piano_engine.py`:
+  - Intelligent multi-feature analysis (track names, General MIDI program changes, Channel 9/10 percussion detection, and melody pitch register heuristics).
+  - Categorizes tracks into roles: `PIANO_LEAD`, `PIANO_ACCOMPANIMENT`, `GUITAR`, `BASS`, `DRUMS`, `OTHER`.
+  - Intelligently recognizes when a piece has segmented piano phrases (such as `Studio Grand` tracks 16-28 in `jan gan man.mid`) and groups them into a cohesive **Main Piano Lead**.
+- Added `MidiScanner.export_piano_lead_midi`:
+  - Automatically isolates and stitches together the piano lead tracks into an individual standalone `.mid` file (e.g. `jan gan man_piano_lead.mid`).
+- Upgraded `GrandPianoPlayer` to support:
+  - `solo_lead`: Plays purely the Main Piano Lead melody on the Grand Piano.
+  - `selected_track_ids`: Allows soloing any specific individual track on the Grand Piano.
+
+### [2026-10-15] - Smart Track CLI Player (play_piano.py)
+- Upgraded `play_piano.py` with:
+  - Rich interactive track inspection table displaying every detected track with badges (`🎹 Main Piano Lead`, `🎸 Guitar`, `🥁 Drums`), note counts, and pitch ranges.
+  - Dedicated playback mode options: Solo Main Piano Lead (recommended), Individual Track Solo, Full Song, and Lead Export.
+  - Command-line flags `--lead` (play solo lead directly), `--track <id>` (solo specific track), and `--export-lead` (generate standalone lead `.mid` file).
+
+### [2026-10-15] - Smart Backend API Enhancements (app.py)
+- Enhanced `/api/files` to return smart metadata including `lead_notes_count`, `lead_track_ids`, and `is_lead_file`.
+- Added `POST /api/export-lead` to trigger on-demand generation and downloading of clean individual Main Piano Lead `.mid` files.
+- Upgraded `POST /api/play-native` with `solo_lead` and `selected_track_ids` parameters so Windows hardware MIDI plays the user-selected track or solo lead.
+
+### [2026-10-15] - Smart Track Studio UI (web/index.html & web/style.css)
+- Added **Smart Track Mode Switcher** bar directly above visualizer:
+  - `Solo Main Piano Lead` tab (primary purpose, enabled by default).
+  - `Solo Individual Track` tab (with dynamic track selection dropdown).
+  - `All Tracks on Grand Piano` tab.
+- Integrated **Smart Track Inspector Modal**:
+  - Displays comprehensive table of all detected MIDI tracks with smart roles (`🎹 Main Piano Lead`, `🎸 Guitar`, `🥁 Drums`), note counts, pitch ranges, and instant solo buttons.
+- Added **"💾 Export Lead .mid"** one-click export button in header and modal.
+- Added corresponding luxury responsive styling in `web/style.css` (modal backdrop, gold highlights, pulse indicators, and track badge styling).
+
+### [2026-10-15] - Smart Client Orchestrator & Lead Renderer (web/piano.js)
+- Upgraded `GrandPianoStudio` in `web/piano.js`:
+  - Default mode set to `lead` (extracting and playing only the Main Piano Lead melody).
+  - Dynamic track filtering based on mode (`lead`, `track`, or `all`).
+  - Integrated modal track inspector with direct track soloing.
+  - Linked export lead endpoint (`/api/export-lead`) to download individual piano lead `.mid` files and automatically register them in the file list.
+  - Added radiant gold color grading and glow particle enhancements in `WaterfallVisualizer` specifically for Main Piano Lead notes.
+
+### [2026-10-15] - Auto-Watch Daemon Lead Optimization (watch_and_play.py)
+- Updated `watch_and_play.py` to automatically analyze incoming MIDI files and perform solo Main Piano Lead playback on the Grand Piano with detailed console insights on detected lead notes and tracks.
+
+### [2026-10-15] - Updated Documentation (README.md)
+- Updated `README.md` to comprehensively document:
+  - Smart Track Identification and melodic phrase grouping.
+  - Dedicated Main Piano Lead soloing commands and individual track selection.
+  - Lead MIDI export workflow and CLI flags (`--lead`, `--track <id>`, `--export-lead`).
+  - Inclusion of the pre-extracted `jan gan man_piano_lead.mid` individual melody file.
+
+
+
+
+
+
+
+
+
 
 
 

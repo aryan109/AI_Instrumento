@@ -36,12 +36,15 @@ def main():
 
     def play_midi(fpath):
         fname = os.path.basename(fpath)
-        print(f"\n[▶ PLAYING] Starting Grand Piano performance for: '{fname}'")
+        parsed = MidiScanner.parse_file(fpath)
+        print(f"\n[★ SMART ANALYSIS] Found {parsed['total_notes']} notes across {len(parsed['tracks'])} tracks.")
+        print(f"    Identified Main Piano Lead: {parsed['lead_notes_count']} notes across {len(parsed['lead_track_ids'])} track phrase(s).")
+        print(f"[▶ PLAYING] Starting Grand Piano performance for: '{fname}' (Main Piano Lead Solo)")
         try:
-            player.play(fpath, speed=1.0, force_grand_piano=True)
+            player.play(fpath, speed=1.0, solo_lead=True, force_grand_piano=True)
             while player.is_playing:
                 time.sleep(0.5)
-            print(f"[✔ FINISHED] Finished playing '{fname}'.")
+            print(f"[✔ FINISHED] Finished playing Main Piano Lead for '{fname}'.")
         except KeyboardInterrupt:
             player.stop()
             raise

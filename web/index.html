@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Instrumento - Grand Piano MIDI Studio</title>
+  <title>AI Instrumento - Smart Grand Piano MIDI Studio</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,24 +17,64 @@
         <div class="brand-icon">🎹</div>
         <div>
           <h1 class="brand-title">AI INSTRUMENTO</h1>
-          <p class="brand-subtitle">Concert Grand Piano MIDI Performance & Visualization Studio</p>
+          <p class="brand-subtitle">Smart MIDI Track Identification &amp; Grand Piano Lead Studio</p>
         </div>
       </div>
 
       <div class="header-actions">
         <div class="file-picker-wrapper">
-          <label for="midiSelect" class="label-muted">Active MIDI File:</label>
+          <label for="midiSelect" class="label-muted">MIDI File:</label>
           <select id="midiSelect" class="select-file">
             <option value="">Scanning directory...</option>
           </select>
           <button id="btnRefreshFiles" class="btn-icon" title="Refresh directory files">🔄</button>
         </div>
 
+        <button id="btnExportLead" class="btn-action gold-btn" title="Export the extracted Main Piano Lead as an individual .mid file">
+          <span>💾 Export Lead .mid</span>
+        </button>
+
+        <button id="btnInspectTracks" class="btn-action" title="Inspect all detected MIDI tracks">
+          <span>🔍 Tracks</span>
+          <span id="trackCountBadge" class="mini-counter">0</span>
+        </button>
+
         <div class="upload-badge" id="dropBadge" title="Drag & drop any .mid file into this window">
           <span>Drop .mid here</span>
         </div>
       </div>
     </header>
+
+    <!-- Smart Track Mode Switcher -->
+    <div class="smart-mode-bar">
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="lead" id="tabLead">
+          <span class="tab-icon">★</span>
+          <span>Solo Main Piano Lead</span>
+          <span class="lead-pill">Primary Purpose</span>
+        </button>
+        <button class="mode-tab" data-mode="track" id="tabTrack">
+          <span class="tab-icon">🎛</span>
+          <span>Solo Individual Track</span>
+        </button>
+        <button class="mode-tab" data-mode="all" id="tabAll">
+          <span class="tab-icon">🎹</span>
+          <span>All Tracks on Grand Piano</span>
+        </button>
+      </div>
+
+      <div class="track-dropdown-wrapper" id="trackSelectWrapper" style="display: none;">
+        <label for="trackSelect" class="label-muted">Select Track to Solo:</label>
+        <select id="trackSelect" class="select-track">
+          <option value="">Loading tracks...</option>
+        </select>
+      </div>
+
+      <div class="mode-lead-info" id="modeLeadInfo">
+        <span class="pulse-indicator">●</span>
+        <span id="leadStatusText">Smart Classifier: Main Piano Lead Identified</span>
+      </div>
+    </div>
 
     <!-- Main Studio View -->
     <main class="studio-main">
@@ -43,9 +83,9 @@
         <div class="file-stats">
           <span class="badge" id="songTitle">jan gan man.mid</span>
           <span class="stat-pill">Duration: <strong id="statDuration">0:00</strong></span>
-          <span class="stat-pill">Notes: <strong id="statNotes">0</strong></span>
-          <span class="stat-pill">Piano Tracks: <strong id="statTracks">Studio Grand</strong></span>
-          <span class="stat-pill">Active Notes: <strong id="statActiveNotes" class="highlight-text">0</strong></span>
+          <span class="stat-pill">Active Notes: <strong id="statNotes">0</strong></span>
+          <span class="stat-pill">Identified Lead: <strong id="statLeadNotes" class="highlight-gold">0 notes</strong></span>
+          <span class="stat-pill">Currently Playing: <strong id="statActiveNotes" class="highlight-cyan">0</strong></span>
         </div>
 
         <div class="audio-mode-selector">
@@ -66,14 +106,14 @@
         <div class="visualizer-overlay" id="visualizerOverlay">
           <button id="overlayPlayBtn" class="big-play-btn">
             <span class="play-icon">▶</span>
-            <span>PLAY ON GRAND PIANO</span>
+            <span id="overlayBtnText">PLAY MAIN PIANO LEAD</span>
           </button>
         </div>
       </section>
 
       <!-- Piano Fallboard with Gold Crest -->
       <div class="fallboard">
-        <div class="piano-brand-emboss">STEINWAY &amp; SONS &bull; CONCERT GRAND</div>
+        <div class="piano-brand-emboss">STEINWAY &amp; SONS &bull; CONCERT GRAND &bull; AI INSTRUMENTO</div>
       </div>
 
       <!-- 88-Key Grand Piano Keyboard -->
@@ -119,10 +159,6 @@
 
           <div class="toggle-controls">
             <label class="switch-label">
-              <input type="checkbox" id="pianoOnlyToggle">
-              <span>Grand Piano Tracks Only</span>
-            </label>
-            <label class="switch-label">
               <input type="checkbox" id="keyLabelsToggle" checked>
               <span>Key Names</span>
             </label>
@@ -130,6 +166,42 @@
         </div>
       </footer>
     </main>
+
+    <!-- Smart Track Inspector Modal -->
+    <div class="modal-backdrop" id="trackModal" style="display: none;">
+      <div class="modal-window">
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title">🔍 Smart MIDI Track Inspector</h2>
+            <p class="modal-subtitle" id="modalSongName">jan gan man.mid</p>
+          </div>
+          <button class="modal-close-btn" id="modalCloseBtn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="track-table-wrapper">
+            <table class="track-table">
+              <thead>
+                <tr>
+                  <th>Track</th>
+                  <th>Name</th>
+                  <th>Smart Role</th>
+                  <th>Notes</th>
+                  <th>Pitch Range</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="trackTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-action gold-btn" id="modalExportBtn">💾 Export Main Piano Lead .mid</button>
+          <button class="btn-action" id="modalCloseBtn2">Close</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="piano.js"></script>

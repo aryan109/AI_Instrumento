@@ -590,3 +590,314 @@ body {
     height: 140px;
   }
 }
+
+/* Smart Mode Bar & Tabs */
+.smart-mode-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 24px;
+  background: #0f121a;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+  gap: 12px;
+  z-index: 9;
+}
+
+.mode-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+}
+
+.mode-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-tab:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.mode-tab.active {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.25) 0%, rgba(212, 175, 55, 0.1) 100%);
+  color: var(--gold-bright);
+  border: 1px solid var(--border-gold);
+  font-weight: 600;
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.2);
+}
+
+.tab-icon {
+  font-size: 0.95rem;
+}
+
+.lead-pill {
+  font-size: 0.65rem;
+  background: linear-gradient(135deg, #d4af37 0%, #aa841c 100%);
+  color: #0b0c10;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.track-dropdown-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.select-track {
+  background: var(--bg-card);
+  color: var(--gold-bright);
+  border: 1px solid var(--border-gold);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.85rem;
+  outline: none;
+  cursor: pointer;
+  max-width: 280px;
+}
+
+.mode-lead-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--gold-bright);
+}
+
+.pulse-indicator {
+  color: #10b981;
+  font-size: 0.75rem;
+  animation: pulseDot 1.5s infinite;
+}
+
+@keyframes pulseDot {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; filter: drop-shadow(0 0 4px #10b981); }
+  100% { opacity: 0.4; }
+}
+
+.btn-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-action:hover {
+  background: var(--bg-card);
+  border-color: var(--gold-primary);
+  color: var(--gold-bright);
+}
+
+.gold-btn {
+  background: rgba(212, 175, 55, 0.15) !important;
+  border-color: var(--gold-primary) !important;
+  color: var(--gold-bright) !important;
+}
+
+.gold-btn:hover {
+  background: rgba(212, 175, 55, 0.3) !important;
+  box-shadow: 0 0 12px var(--gold-glow);
+}
+
+.mini-counter {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  color: var(--accent-cyan);
+}
+
+.highlight-gold {
+  color: var(--gold-bright) !important;
+}
+
+.highlight-cyan {
+  color: var(--accent-cyan) !important;
+}
+
+/* Track Inspector Modal */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  animation: fadeIn 0.2s ease;
+}
+
+.modal-window {
+  background: #131722;
+  border: 1px solid var(--border-gold);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 850px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(212, 175, 55, 0.15);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: #171c29;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.modal-title {
+  font-family: 'Cinzel', serif;
+  font-size: 1.25rem;
+  color: var(--gold-bright);
+}
+
+.modal-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.6rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.modal-close-btn:hover {
+  color: #fff;
+}
+
+.modal-body {
+  padding: 16px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.track-table-wrapper {
+  overflow-x: auto;
+}
+
+.track-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.track-table th {
+  text-align: left;
+  padding: 10px 12px;
+  background: #181d2b;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  font-weight: 600;
+}
+
+.track-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.track-table tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.track-table tr.is-lead-row {
+  background: rgba(212, 175, 55, 0.08);
+}
+
+.track-table tr.is-lead-row td {
+  color: var(--gold-bright);
+}
+
+.badge-lead {
+  background: rgba(212, 175, 55, 0.2);
+  color: var(--gold-bright);
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--gold-primary);
+  font-weight: 600;
+  display: inline-block;
+}
+
+.badge-other {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  border-radius: 12px;
+  display: inline-block;
+}
+
+.btn-table-solo {
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid var(--gold-primary);
+  color: var(--gold-bright);
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-table-solo:hover {
+  background: var(--gold-bright);
+  color: #0b0c10;
+  font-weight: 600;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 24px;
+  background: #171c29;
+  border-top: 1px solid var(--border-subtle);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

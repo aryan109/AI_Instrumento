@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import msvcrt
+import argparse
 from pathlib import Path
 
 # Ensure UTF-8 output on Windows consoles
@@ -23,58 +24,27 @@ try:
     from rich.console import Console
     from rich.panel import Panel
     from rich.table import Table
-    from rich.progress import BarColumn, Progress, TextColumn
-    from rich.live import Live
-    from rich.layout import Layout
-    from rich.text import Text
     USE_RICH = True
 except ImportError:
     USE_RICH = False
 
 console = Console() if USE_RICH else None
 
-def draw_piano_keyboard(active_notes: set, start_octave: int = 2, num_octaves: int = 5) -> str:
+def draw_piano_keyboard(active_notes: set, start_octave: int = 2, num_octaves: int = 4) -> str:
     """Renders an ASCII visualization of piano keys across octaves, highlighting active notes."""
-    # White keys in an octave: C, D, E, F, G, A, B
-    # Note numbers: C=0, D=2, E=4, F=5, G=7, A=9, B=11
-    # Black keys: C#=1, D#=3, F#=6, G#=8, A#=10
-    
     top_row = []
     bot_row = []
     
     for octv in range(start_octave, start_octave + num_octaves):
         base = (octv + 1) * 12
-        notes_in_oct = [
-            (base + 0, "C"),
-            (base + 1, "C#"),
-            (base + 2, "D"),
-            (base + 3, "D#"),
-            (base + 4, "E"),
-            (base + 5, "F"),
-            (base + 6, "F#"),
-            (base + 7, "G"),
-            (base + 8, "G#"),
-            (base + 9, "A"),
-            (base + 10, "A#"),
-            (base + 11, "B"),
-        ]
-        
-        # Build white key representation with black key slots
-        # C, C#, D, D#, E, F, F#, G, G#, A, A#, B
         c = "██" if (base + 0) in active_notes else "  "
-        cs = "█" if (base + 1) in active_notes else "│"
         d = "██" if (base + 2) in active_notes else "  "
-        ds = "█" if (base + 3) in active_notes else "│"
         e = "██" if (base + 4) in active_notes else "  "
         f = "██" if (base + 5) in active_notes else "  "
-        fs = "█" if (base + 6) in active_notes else "│"
         g = "██" if (base + 7) in active_notes else "  "
-        gs = "█" if (base + 8) in active_notes else "│"
         a = "██" if (base + 9) in active_notes else "  "
-        as_ = "█" if (base + 10) in active_notes else "│"
         b = "██" if (base + 11) in active_notes else "  "
         
-        # Black keys top row
         b_c_sharp = "■" if (base + 1) in active_notes else "#"
         b_d_sharp = "■" if (base + 3) in active_notes else "#"
         b_f_sharp = "■" if (base + 6) in active_notes else "#"
@@ -91,12 +61,18 @@ def format_time(seconds: float) -> str:
     s = int(seconds) % 60
     return f"{m:02d}:{s:02d}"
 
-def play_file(file_path: str):
+def play_file(file_path: str, solo_lead: bool = True, selected_track_ids: list = None):
     file_name = os.path.basename(file_path)
+    parsed = MidiScanner.parse_file(file_path)
+
+    mode_title = "Solo Main Piano Lead" if solo_lead else (
+        f"Track {selected_track_ids[0]} Solo" if selected_track_ids else "All Tracks on Grand Piano"
+    )
+
     if USE_RICH:
-        console.print(f"\n[bold gold1]🎹 Loading Grand Piano Sound Engine for:[/bold gold1] [bold cyan]{file_name}[/bold cyan]")
+        console.print(f"\n[bold gold1]🎹 Grand Piano Engine:[/bold gold1] [bold cyan]{file_name}[/bold cyan] ([bold yellow]{mode_title}[/bold yellow])")
     else:
-        print(f"\nLoading Grand Piano Sound Engine for: {file_name}")
+        print(f"\nGrand Piano Engine: {file_name} ({mode_title})")
 
     synth = WindowsMidiSynthesizer()
     if not synth.is_open:
@@ -106,22 +82,27 @@ def play_file(file_path: str):
 
     active_notes = set()
 
-    def on_note(pitch, velocity, is_on):
+    def on_note(pitch, velocity, is_on, note_info):
         if is_on:
             active_notes.add(pitch)
         else:
             active_notes.discard(pitch)
 
     player.on_note_callback = on_note
-    player.play(file_path, speed=1.0, force_grand_piano=True)
+    player.play(
+        file_path,
+        speed=1.0,
+        solo_lead=solo_lead,
+        selected_track_ids=selected_track_ids,
+        force_grand_piano=True
+    )
 
-    header = f"🎹 AI Instrumento - Playing on Grand Piano: {file_name}"
+    header = f"🎹 AI Instrumento - Grand Piano: {file_name} [{mode_title}]"
     controls_help = "[Space]: Pause/Resume  |  [+ / -]: Speed  |  [R]: Restart  |  [Q]: Stop & Exit"
 
     try:
         last_print = 0
         while player.is_playing:
-            # Check non-blocking keyboard input on Windows
             if msvcrt.kbhit():
                 ch = msvcrt.getch()
                 if ch in [b'q', b'Q', b'\x1b']:
@@ -137,9 +118,14 @@ def play_file(file_path: str):
                     player.speed = max(0.2, round(player.speed - 0.1, 1))
                 elif ch in [b'r', b'R']:
                     player.stop()
-                    player.play(file_path, speed=player.speed, force_grand_piano=True)
+                    player.play(
+                        file_path,
+                        speed=player.speed,
+                        solo_lead=solo_lead,
+                        selected_track_ids=selected_track_ids,
+                        force_grand_piano=True
+                    )
 
-            # Update terminal display at ~20 fps
             now = time.time()
             if now - last_print >= 0.05:
                 last_print = now
@@ -162,11 +148,9 @@ def play_file(file_path: str):
                     table.add_row(f"[bold green]Active Notes ({len(active_notes)}):[/bold green] [bold white]{notes_str}[/bold white]")
                     table.add_row(f"[dim]{controls_help}[/dim]")
                     
-                    # Piano keyboard graphic
                     kb_art = draw_piano_keyboard(active_notes, start_octave=2, num_octaves=4)
                     table.add_row(Panel(f"[yellow]{kb_art}[/yellow]", title="Grand Piano Keys (Octaves C2-B5)"))
                     
-                    # Clear screen and print
                     os.system('cls' if os.name == 'nt' else 'clear')
                     console.print(table)
                 else:
@@ -183,49 +167,121 @@ def play_file(file_path: str):
         print("\nPlayback stopped. Thank you for using AI Instrumento.")
 
 
+def show_track_inspection(file_path: str):
+    parsed = MidiScanner.parse_file(file_path)
+    if USE_RICH:
+        table = Table(title=f"Smart MIDI Track Identification: {parsed['file_name']}", border_style="gold1")
+        table.add_column("Track ID", justify="right", style="cyan")
+        table.add_column("Track Name", style="white")
+        table.add_column("Role / Badge", style="bold green")
+        table.add_column("Notes", justify="right", style="yellow")
+        table.add_column("Pitch Range", style="magenta")
+        table.add_column("Lead Status", style="bold gold1")
+
+        for t in parsed["tracks"]:
+            is_lead_str = "★ MAIN LEAD" if t["is_piano_lead"] else "Accompaniment"
+            range_str = f"{midi_to_note_name(t['pitch_min'])} - {midi_to_note_name(t['pitch_max'])} (avg {t['pitch_avg']})"
+            table.add_row(
+                str(t["id"]),
+                t["name"],
+                t["badge"],
+                str(t["notes_count"]),
+                range_str,
+                is_lead_str
+            )
+        console.print(table)
+        console.print(f"[bold gold1]Identified Main Piano Lead:[/bold gold1] {parsed['lead_notes_count']} total lead notes across {len(parsed['lead_track_ids'])} track phrase(s).")
+    else:
+        print(f"\nSmart MIDI Track Identification: {parsed['file_name']}")
+        print("-" * 75)
+        for t in parsed["tracks"]:
+            lead_tag = " [MAIN LEAD]" if t["is_piano_lead"] else ""
+            print(f"Track {t['id']:2d}: {t['name']:<20} | {t['badge']:<22} | Notes: {t['notes_count']:4d} | Range: {t['pitch_min']}-{t['pitch_max']}{lead_tag}")
+        print(f"Total Piano Lead notes: {parsed['lead_notes_count']}")
+
+
 def main():
+    parser = argparse.ArgumentParser(description="AI Instrumento - Smart Grand Piano MIDI Player")
+    parser.add_argument("file", nargs="?", help="MIDI file path to play")
+    parser.add_argument("--lead", action="store_true", help="Play only the Main Piano Lead")
+    parser.add_argument("--all", action="store_true", help="Play all tracks on Grand Piano")
+    parser.add_argument("--track", type=int, help="Play specific track ID solo")
+    parser.add_argument("--export-lead", action="store_true", help="Export Main Piano Lead to standalone .mid file")
+    args = parser.parse_args()
+
     directory = "."
     files = MidiScanner.list_midi_files(directory)
 
     if not files:
         print("\n[!] No .mid or .midi files found in the current directory.")
-        print("Please place a MIDI file (e.g. 'jan gan man.mid') in this directory and try again.")
         sys.exit(1)
 
-    # If specified via command line argument
-    if len(sys.argv) > 1:
-        target = sys.argv[1]
-        target_path = Path(target)
+    # Determine file
+    target_path = None
+    if args.file:
+        target_path = Path(args.file)
         if not target_path.exists():
-            target_path = Path(directory) / target
+            target_path = Path(directory) / args.file
         if not target_path.exists():
-            print(f"Error: Specified MIDI file '{target}' not found.")
+            print(f"Error: Specified MIDI file '{args.file}' not found.")
             sys.exit(1)
-        play_file(str(target_path))
+    else:
+        # Pick default: prefer jan gan man.mid or lead file or first file
+        lead_cand = [f for f in files if "jan gan man" in f["name"].lower() and not f["is_lead_file"]]
+        target_path = Path(lead_cand[0]["path"]) if lead_cand else Path(files[0]["path"])
+
+    # Export lead option
+    if args.export_lead:
+        out_file = MidiScanner.export_piano_lead_midi(str(target_path))
+        print(f"\n[✔] Main Piano Lead exported successfully to: '{out_file}'")
         return
 
-    # If only 1 file is present, select it automatically or show menu
-    if len(files) == 1:
-        print(f"\n[AI Instrumento] Found 1 MIDI file: '{files[0]['name']}'")
-        play_file(files[0]["path"])
+    # Direct flag playback
+    if args.lead:
+        play_file(str(target_path), solo_lead=True)
+        return
+    elif args.all:
+        play_file(str(target_path), solo_lead=False)
+        return
+    elif args.track is not None:
+        play_file(str(target_path), solo_lead=False, selected_track_ids=[args.track])
         return
 
-    # Multiple files present: display menu
-    print("\n==========================================")
-    print("      🎹 AI INSTRUMENTO - MIDI FILES      ")
-    print("==========================================")
-    for idx, f in enumerate(files, 1):
-        print(f"  [{idx}] {f['name']} ({round(f['size_bytes'] / 1024, 1)} KB)")
-    print("==========================================")
+    # Interactive Menu
+    show_track_inspection(str(target_path))
+
+    print("\n" + "=" * 50)
+    print("      🎹 SELECT GRAND PIANO PLAYBACK MODE        ")
+    print("=" * 50)
+    print("  [1] ★ Play Solo Main Piano Lead (RECOMMENDED) ")
+    print("  [2] 🎛 Play Specific Individual Track Solo    ")
+    print("  [3] 🎹 Play All Tracks on Grand Piano         ")
+    print("  [4] 💾 Export Piano Lead to Standalone .mid   ")
+    print("  [5] 📂 Switch to another MIDI file            ")
+    print("=" * 50)
 
     try:
-        choice = input(f"Select a file to play on Grand Piano (1-{len(files)}) [Default: 1]: ").strip()
-        idx = int(choice) if choice else 1
-        if 1 <= idx <= len(files):
-            play_file(files[idx - 1]["path"])
-        else:
-            print("Invalid choice, defaulting to 1.")
-            play_file(files[0]["path"])
+        choice = input("Enter choice (1-5) [Default: 1]: ").strip() or "1"
+        if choice == "1":
+            play_file(str(target_path), solo_lead=True)
+        elif choice == "2":
+            trk_str = input("Enter Track ID to solo (e.g. 16): ").strip()
+            try:
+                trk_id = int(trk_str)
+                play_file(str(target_path), solo_lead=False, selected_track_ids=[trk_id])
+            except ValueError:
+                print("Invalid track ID.")
+        elif choice == "3":
+            play_file(str(target_path), solo_lead=False)
+        elif choice == "4":
+            out_file = MidiScanner.export_piano_lead_midi(str(target_path))
+            print(f"\n[✔] Exported to '{out_file}'. Playing exported lead now...")
+            play_file(out_file, solo_lead=False)
+        elif choice == "5":
+            for idx, f in enumerate(files, 1):
+                print(f"  [{idx}] {f['name']}")
+            f_idx = int(input(f"Select file (1-{len(files)}): ").strip())
+            play_file(files[f_idx - 1]["path"], solo_lead=True)
     except (ValueError, KeyboardInterrupt):
         print("\nExiting.")
 

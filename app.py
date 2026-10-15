@@ -44,17 +44,20 @@ class PianoStudioHandler(SimpleHTTPRequestHandler):
         # API: List all MIDI files in directory
         if path == "/api/files":
             files = MidiScanner.list_midi_files(str(ROOT_DIR))
-            # Enrich with total note counts & durations if possible
             enriched = []
             for f in files:
                 try:
                     summary = MidiScanner.parse_file(f["path"])
                     f["duration"] = summary["duration"]
                     f["total_notes"] = summary["total_notes"]
+                    f["lead_notes_count"] = summary["lead_notes_count"]
+                    f["lead_track_ids"] = summary["lead_track_ids"]
                     f["tracks"] = summary["tracks"]
                 except Exception:
                     f["duration"] = 0
                     f["total_notes"] = 0
+                    f["lead_notes_count"] = 0
+                    f["lead_track_ids"] = []
                     f["tracks"] = []
                 enriched.append(f)
 
@@ -92,10 +95,36 @@ class PianoStudioHandler(SimpleHTTPRequestHandler):
                 payload = json.loads(body.decode('utf-8'))
                 file_name = payload.get("file")
                 speed = float(payload.get("speed", 1.0))
+                solo_lead = bool(payload.get("solo_lead", True))
+                selected_track_ids = payload.get("selected_track_ids", None)
                 file_path = ROOT_DIR / file_name
                 if file_path.exists():
-                    native_player.play(str(file_path), speed=speed, force_grand_piano=True)
-                    self.send_json({"status": "playing", "file": file_name})
+                    native_player.play(
+                        str(file_path),
+                        speed=speed,
+                        solo_lead=solo_lead,
+                        selected_track_ids=selected_track_ids,
+                        force_grand_piano=True
+                    )
+                    self.send_json({"status": "playing", "file": file_name, "solo_lead": solo_lead})
+                else:
+                    self.send_json({"error": "File not found"}, status=404)
+            except Exception as e:
+                self.send_json({"error": str(e)}, status=500)
+            return
+
+        elif path == "/api/export-lead":
+            try:
+                payload = json.loads(body.decode('utf-8'))
+                file_name = payload.get("file")
+                file_path = ROOT_DIR / file_name
+                if file_path.exists():
+                    lead_path = MidiScanner.export_piano_lead_midi(str(file_path))
+                    self.send_json({
+                        "success": True,
+                        "lead_file": os.path.basename(lead_path),
+                        "path": lead_path
+                    })
                 else:
                     self.send_json({"error": "File not found"}, status=404)
             except Exception as e:
@@ -111,6 +140,7 @@ class PianoStudioHandler(SimpleHTTPRequestHandler):
             native_player.stop()
             self.send_json({"status": "stopped"})
             return
+
 
         # API: Upload a new MIDI file
         elif path == "/api/upload":
